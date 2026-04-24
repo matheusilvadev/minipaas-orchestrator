@@ -1,0 +1,78 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: paas-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    networks:
+      - paas-network
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: paas-backend
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      # SPRING
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+
+      # DATABASE
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # JPA
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+
+      # SECURITY
+      SPRING_SECURITY_USER_NAME: ${SPRING_SECURITY_USER_NAME}
+      SPRING_SECURITY_USER_PASSWORD: ${SPRING_SECURITY_USER_PASSWORD}
+
+      # CUSTOM (para seu backend usar)
+      WORKSPACE_PATH: ${WORKSPACE_PATH}
+      APP_DEFAULT_PORT: ${APP_DEFAULT_PORT}
+      CONTAINER_INTERNAL_PORT: ${CONTAINER_INTERNAL_PORT}
+
+    volumes:
+      # 🔴 CRÍTICO: acesso ao Docker do host
+      - /var/run/docker.sock:/var/run/docker.sock
+
+      # Workspace persistente
+      - ${WORKSPACE_PATH}:${WORKSPACE_PATH}
+
+    networks:
+      - paas-network
+
+volumes:
+  postgres_data:
+
+
+networks:
+  paas-network:
+    driver: bridge

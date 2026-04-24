@@ -1,0 +1,140 @@
+openapi: 3.0.3
+info:
+  title: Mini PaaS API
+  version: 0.0.1
+  description: API base para cadastro de aplicacoes, disparo de deploys, consulta de logs e gerenciamento de containers.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Applications
+  - name: Deployments
+  - name: Containers
+
+paths:
+  /applications:
+    get:
+      tags: [Applications]
+      summary: Lista aplicacoes cadastradas
+      responses:
+        "200":
+          description: Lista retornada com sucesso
+    post:
+      tags: [Applications]
+      summary: Cadastra uma nova aplicacao
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApplicationRequest"
+      responses:
+        "201":
+          description: Aplicacao criada com sucesso
+  /applications/{applicationId}:
+    get:
+      tags: [Applications]
+      summary: Consulta uma aplicacao
+      parameters:
+        - $ref: "#/components/parameters/ApplicationId"
+      responses:
+        "200":
+          description: Aplicacao encontrada
+        "404":
+          description: Aplicacao nao encontrada
+  /applications/{applicationId}/deployments:
+    get:
+      tags: [Deployments]
+      summary: Lista deploys de uma aplicacao
+      parameters:
+        - $ref: "#/components/parameters/ApplicationId"
+      responses:
+        "200":
+          description: Lista de deploys retornada com sucesso
+    post:
+      tags: [Deployments]
+      summary: Inicia um deploy manual
+      parameters:
+        - $ref: "#/components/parameters/ApplicationId"
+      responses:
+        "202":
+          description: Deploy aceito para processamento assíncrono
+  /deployments/{deploymentId}:
+    get:
+      tags: [Deployments]
+      summary: Consulta um deploy
+      parameters:
+        - $ref: "#/components/parameters/DeploymentId"
+      responses:
+        "200":
+          description: Deploy encontrado
+        "404":
+          description: Deploy nao encontrado
+  /deployments/{deploymentId}/logs:
+    get:
+      tags: [Deployments]
+      summary: Consulta logs de um deploy
+      parameters:
+        - $ref: "#/components/parameters/DeploymentId"
+      responses:
+        "200":
+          description: Logs retornados com sucesso
+  /containers:
+    get:
+      tags: [Containers]
+      summary: Lista containers ativos
+      responses:
+        "200":
+          description: Lista de containers retornada com sucesso
+  /containers/{containerId}/stop:
+    post:
+      tags: [Containers]
+      summary: Para um container manualmente
+      parameters:
+        - $ref: "#/components/parameters/ContainerId"
+      responses:
+        "202":
+          description: Solicitação de parada aceita
+
+components:
+  parameters:
+    ApplicationId:
+      name: applicationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeploymentId:
+      name: deploymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ContainerId:
+      name: containerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    CreateApplicationRequest:
+      type: object
+      required:
+        - name
+        - repositoryUrl
+        - branch
+      properties:
+        name:
+          type: string
+          example: meu-servico
+        repositoryUrl:
+          type: string
+          example: https://github.com/example/meu-servico.git
+        branch:
+          type: string
+          example: main
