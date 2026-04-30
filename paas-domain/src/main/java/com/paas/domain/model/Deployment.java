@@ -9,10 +9,23 @@ public class Deployment {
     private final UUID applicationId;
     private DeploymentStatus status;
 
+    // Construtor para novos Deploys (Always PENDING)
     public Deployment(UUID id, UUID applicationId) {
         this.id = id;
         this.applicationId = applicationId;
         this.status = DeploymentStatus.PENDING; // Estado inicial garantido
+    }
+
+    // Construtor privado para reconstrução
+    private Deployment(UUID id, UUID applicationId, DeploymentStatus status) {
+        this.id = id;
+        this.applicationId = applicationId;
+        this.status = status;
+    }
+
+    // Método estático de reidratação (Uso exclusivo da Infra/Testes)
+    public static Deployment rehydrate(UUID id, UUID applicationId, DeploymentStatus status) {
+        return new Deployment(id, applicationId, status);
     }
 
     public void startBuilding() {
