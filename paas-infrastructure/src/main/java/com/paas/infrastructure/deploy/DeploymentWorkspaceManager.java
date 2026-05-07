@@ -6,9 +6,13 @@ import java.nio.file.Paths;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import org.springframework.util.FileSystemUtils;
 
-public class DeploymentWorkspaceManager {
+import com.paas.application.port.out.DeploymentWorkspacePort;
+
+@Component
+public class DeploymentWorkspaceManager implements DeploymentWorkspacePort {
     private final String baseWorkDir;
 
     // O valor virá do application.properties, ex:
@@ -17,6 +21,7 @@ public class DeploymentWorkspaceManager {
         this.baseWorkDir = baseWorkDir;
     }
 
+    @Override
     public File createWorkspace(UUID deploymentId) {
         Path path = Paths.get(baseWorkDir, deploymentId.toString());
         File directory = path.toFile();
@@ -30,6 +35,7 @@ public class DeploymentWorkspaceManager {
         return directory;
     }
 
+    @Override
     public void cleanup(UUID deploymentId) {
         Path path = Paths.get(baseWorkDir, deploymentId.toString());
         FileSystemUtils.deleteRecursively(path.toFile());
