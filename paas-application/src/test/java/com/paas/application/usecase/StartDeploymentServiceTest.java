@@ -35,7 +35,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -99,7 +98,8 @@ class StartDeploymentServiceTest {
                                 .thenAnswer(invocation -> {
                                         Deployment deployment = invocation.getArgument(0);
                                         if (deployment.status() == DeploymentStatus.PENDING) {
-                                                return Deployment.rehydrate(deploymentId, applicationId, DeploymentStatus.PENDING);
+                                                return Deployment.rehydrate(deploymentId, applicationId,
+                                                                DeploymentStatus.PENDING);
                                         }
                                         return Deployment.rehydrate(deploymentId, applicationId, deployment.status());
                                 });
@@ -238,7 +238,6 @@ class StartDeploymentServiceTest {
                                 });
                 when(portAllocatorPort.allocate()).thenReturn(allocatedPort);
                 when(deploymentWorkspacePort.createWorkspace(deploymentId)).thenReturn(workspace);
-                when(dockerRuntimePort.runContainer(anyString(), anyInt())).thenReturn("container-123");
                 org.mockito.Mockito.doThrow(new RuntimeException("docker build failed"))
                                 .when(dockerRuntimePort).buildImage("my-service:" + deploymentId, workspace);
 
