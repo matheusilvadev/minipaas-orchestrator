@@ -3,6 +3,7 @@ package com.paas.application.usecase;
 import java.io.File;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import com.paas.application.dto.command.StartDeploymentCommand;
 import com.paas.application.dto.result.DeploymentResult;
@@ -12,6 +13,7 @@ import com.paas.application.port.in.StartDeploymentUseCase;
 import com.paas.application.port.out.ApplicationRepositoryPort;
 import com.paas.application.port.out.ContainerRepositoryPort;
 import com.paas.application.port.out.DeploymentRepositoryPort;
+import com.paas.application.port.out.DeploymentLogPublisherPort;
 import com.paas.application.port.out.DeploymentWorkspacePort;
 import com.paas.application.port.out.DockerRuntimePort;
 import com.paas.application.port.out.GitClientPort;
@@ -30,6 +32,7 @@ public class StartDeploymentService implements StartDeploymentUseCase {
     private final DeploymentWorkspacePort deploymentWorkspacePort;
     private final GitClientPort gitClientPort;
     private final DockerRuntimePort dockerRuntimePort;
+    private final DeploymentLogPublisherPort deploymentLogPublisherPort;
     private final DeploymentPolicy deploymentPolicy;
 
     public StartDeploymentService(ApplicationRepositoryPort applicationRepositoryPort,
@@ -39,6 +42,7 @@ public class StartDeploymentService implements StartDeploymentUseCase {
             DeploymentWorkspacePort deploymentWorkspacePort,
             GitClientPort gitClientPort,
             DockerRuntimePort dockerRuntimePort,
+            DeploymentLogPublisherPort deploymentLogPublisherPort,
             DeploymentPolicy deploymentPolicy) {
         this.applicationRepositoryPort = applicationRepositoryPort;
         this.deploymentRepositoryPort = deploymentRepositoryPort;
@@ -47,6 +51,7 @@ public class StartDeploymentService implements StartDeploymentUseCase {
         this.deploymentWorkspacePort = deploymentWorkspacePort;
         this.gitClientPort = gitClientPort;
         this.dockerRuntimePort = dockerRuntimePort;
+        this.deploymentLogPublisherPort = deploymentLogPublisherPort;
         this.deploymentPolicy = deploymentPolicy;
     }
 
@@ -63,37 +68,47 @@ public class StartDeploymentService implements StartDeploymentUseCase {
 
         Deployment newDeployment = new Deployment(UUID.randomUUID(), application.id());
         Deployment deployment = deploymentRepositoryPort.save(newDeployment);
+        UUID deploymentId = deployment.id();
         PortNumber allocatedPort = null;
         String containerId = null;
         boolean workspaceCreated = false;
 
         try {
+            publish(deploymentId, "Deployment started");
             allocatedPort = portAllocatorPort.allocate();
-            File workspace = deploymentWorkspacePort.createWorkspace(deployment.id());
+            publish(deploymentId, "Allocated port " + allocatedPort.value());
+            File workspace = deploymentWorkspacePort.createWorkspace(deploymentId);
             workspaceCreated = true;
+            publish(deploymentId, "Workspace created at " + workspace.getAbsolutePath());
 
-            gitClientPort.clone(application.repositoryUrl(), application.branchName(), workspace);
+            Consumer<String> logPublisher = message -> publish(deploymentId, message);
+            gitClientPort.clone(application.repositoryUrl(), application.branchName(), workspace, logPublisher);
 
             deployment.startBuilding();
             deployment = deploymentRepositoryPort.save(deployment);
+            publish(deploymentId, "Docker build started");
 
             String imageName = buildImageName(application, deployment);
-            dockerRuntimePort.buildImage(imageName, workspace);
+            dockerRuntimePort.buildImage(imageName, workspace, logPublisher);
+            publish(deploymentId, "Docker container startup started");
             containerId = dockerRuntimePort.runContainer(imageName, allocatedPort.value());
+            publish(deploymentId, "Container started: " + containerId);
 
             ContainerInstance containerInstance = new ContainerInstance(
                     UUID.randomUUID(),
-                    deployment.id(),
+                    deploymentId,
                     containerId,
                     allocatedPort);
             containerRepositoryPort.save(containerInstance);
 
             deployment.markRunning();
             deployment = deploymentRepositoryPort.save(deployment);
+            publish(deploymentId, "Deployment finished successfully");
 
             return new DeploymentResult(deployment.id(), deployment.status().name());
         } catch (RuntimeException ex) {
             handleFailure(deployment, allocatedPort, containerId, workspaceCreated);
+            publish(deploymentId, "Deployment failed: " + ex.getMessage());
             throw new DeploymentFailedException(
                     "Deployment failed for application " + application.id() + ": " + ex.getMessage());
         }
@@ -127,5 +142,9 @@ public class StartDeploymentService implements StartDeploymentUseCase {
         if (workspaceCreated) {
             deploymentWorkspacePort.cleanup(deployment.id());
         }
+    }
+
+    private void publish(UUID deploymentId, String message) {
+        deploymentLogPublisherPort.publish(deploymentId, message);
     }
 }

@@ -6,6 +6,7 @@ import com.paas.application.exception.ApplicationNotFoundException;
 import com.paas.application.exception.DeploymentFailedException;
 import com.paas.application.port.out.ApplicationRepositoryPort;
 import com.paas.application.port.out.ContainerRepositoryPort;
+import com.paas.application.port.out.DeploymentLogPublisherPort;
 import com.paas.application.port.out.DeploymentRepositoryPort;
 import com.paas.application.port.out.DeploymentWorkspacePort;
 import com.paas.application.port.out.DockerRuntimePort;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -64,6 +66,9 @@ class StartDeploymentServiceTest {
         @Mock
         private DockerRuntimePort dockerRuntimePort;
 
+        @Mock
+        private DeploymentLogPublisherPort deploymentLogPublisherPort;
+
         private StartDeploymentService startDeploymentService;
 
         @BeforeEach
@@ -76,6 +81,7 @@ class StartDeploymentServiceTest {
                                 deploymentWorkspacePort,
                                 gitClientPort,
                                 dockerRuntimePort,
+                                deploymentLogPublisherPort,
                                 new DeploymentPolicy());
         }
 
@@ -125,11 +131,13 @@ class StartDeploymentServiceTest {
 
                 verify(portAllocatorPort).allocate();
                 verify(deploymentWorkspacePort).createWorkspace(deploymentId);
-                verify(gitClientPort).clone(application.repositoryUrl(), application.branchName(), workspace);
-                verify(dockerRuntimePort).buildImage("my-service:" + deploymentId, workspace);
+                verify(gitClientPort).clone(eq(application.repositoryUrl()), eq(application.branchName()), eq(workspace),
+                                any());
+                verify(dockerRuntimePort).buildImage(eq("my-service:" + deploymentId), eq(workspace), any());
                 verify(dockerRuntimePort).runContainer("my-service:" + deploymentId, allocatedPort.value());
                 verify(deploymentWorkspacePort, never()).cleanup(any(UUID.class));
                 verify(portAllocatorPort, never()).release(any(PortNumber.class));
+                verify(deploymentLogPublisherPort, times(7)).publish(eq(deploymentId), anyString());
 
                 assertThat(savedContainer.deploymentId()).isEqualTo(deploymentId);
                 assertThat(savedContainer.containerId()).isEqualTo("container-123");
@@ -196,7 +204,8 @@ class StartDeploymentServiceTest {
                                 });
                 when(portAllocatorPort.allocate()).thenReturn(allocatedPort);
                 when(deploymentWorkspacePort.createWorkspace(deploymentId)).thenReturn(workspace);
-                when(gitClientPort.clone(application.repositoryUrl(), application.branchName(), workspace))
+                when(gitClientPort.clone(eq(application.repositoryUrl()), eq(application.branchName()), eq(workspace),
+                                any()))
                                 .thenThrow(new RuntimeException("git clone failed"));
 
                 assertThatThrownBy(() -> startDeploymentService.execute(command))
@@ -211,7 +220,7 @@ class StartDeploymentServiceTest {
 
                 verify(portAllocatorPort).release(allocatedPort);
                 verify(deploymentWorkspacePort).cleanup(deploymentId);
-                verify(dockerRuntimePort, never()).buildImage(anyString(), any(File.class));
+                verify(dockerRuntimePort, never()).buildImage(anyString(), any(File.class), any());
                 verify(dockerRuntimePort, never()).runContainer(anyString(), anyInt());
                 verify(containerRepositoryPort, never()).save(any(ContainerInstance.class));
         }
@@ -239,7 +248,8 @@ class StartDeploymentServiceTest {
                 when(portAllocatorPort.allocate()).thenReturn(allocatedPort);
                 when(deploymentWorkspacePort.createWorkspace(deploymentId)).thenReturn(workspace);
                 org.mockito.Mockito.doThrow(new RuntimeException("docker build failed"))
-                                .when(dockerRuntimePort).buildImage("my-service:" + deploymentId, workspace);
+                                .when(dockerRuntimePort).buildImage(eq("my-service:" + deploymentId), eq(workspace),
+                                                any());
 
                 assertThatThrownBy(() -> startDeploymentService.execute(command))
                                 .isInstanceOf(DeploymentFailedException.class)

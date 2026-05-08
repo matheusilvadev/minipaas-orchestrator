@@ -15,6 +15,7 @@ import com.paas.application.port.in.StopContainerUseCase;
 import com.paas.application.port.out.ApplicationRepositoryPort;
 import com.paas.application.port.out.ContainerRepositoryPort;
 import com.paas.application.port.out.DeploymentLogPort;
+import com.paas.application.port.out.DeploymentLogPublisherPort;
 import com.paas.application.port.out.DeploymentRepositoryPort;
 import com.paas.application.port.out.DeploymentWorkspacePort;
 import com.paas.application.port.out.DockerRuntimePort;
@@ -63,6 +64,7 @@ public class BootstrapConfig {
             DeploymentWorkspacePort deploymentWorkspacePort,
             GitClientPort gitClientPort,
             DockerRuntimePort dockerRuntimePort,
+            DeploymentLogPublisherPort deploymentLogPublisherPort,
             DeploymentPolicy deploymentPolicy) {
         return new StartDeploymentService(
                 applicationRepositoryPort,
@@ -72,6 +74,7 @@ public class BootstrapConfig {
                 deploymentWorkspacePort,
                 gitClientPort,
                 dockerRuntimePort,
+                deploymentLogPublisherPort,
                 deploymentPolicy);
     }
 

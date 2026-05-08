@@ -1,6 +1,7 @@
 package com.paas.infrastructure.docker;
 
 import java.io.File;
+import java.util.function.Consumer;
 
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,11 @@ public class ProcessBuilderDockerRuntimeAdapter implements DockerRuntimePort {
     public void buildImage(String imageName, File contextDir) {
         dockerExecutor.build(imageName, contextDir);
 
+    }
+
+    @Override
+    public void buildImage(String imageName, File contextDir, Consumer<String> logConsumer) {
+        dockerExecutor.build(imageName, contextDir, logConsumer);
     }
 
     @Override

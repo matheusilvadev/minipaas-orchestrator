@@ -1,6 +1,7 @@
 package com.paas.application.port.out;
 
 import java.io.File;
+import java.util.function.Consumer;
 
 import com.paas.domain.valueobject.RepositoryUrl;
 
@@ -14,4 +15,8 @@ public interface GitClientPort {
      * @return O diretórioonde o código foi clonado
      */
     File clone(RepositoryUrl url, String branch, File destination);
+
+    default File clone(RepositoryUrl url, String branch, File destination, Consumer<String> logConsumer) {
+        return clone(url, branch, destination);
+    }
 }
